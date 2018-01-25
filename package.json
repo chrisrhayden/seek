@@ -1,0 +1,36 @@
+{
+  "name": "seek",
+  "version": "1.0.0",
+  "description": "## Usage",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "npm run lint && react-scripts test --env=jsdom",
+    "flow": "node_modules/.bin/flow",
+    "test_cov": "npm run lint && react-scripts test --env=jsdom --coverage",
+    "lint": "node_modules/.bin/eslint src/",
+    "lint_fix": "node_modules/.bin/eslint --fix src/"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "eslint": "^4.16.0",
+    "eslint-config-standard": "^11.0.0-beta.0",
+    "eslint-config-standard-jsx": "^4.0.2",
+    "eslint-plugin-import": "^2.8.0",
+    "eslint-plugin-node": "^5.2.1",
+    "eslint-plugin-promise": "^3.6.0",
+    "eslint-plugin-react": "^7.5.1",
+    "eslint-plugin-standard": "^3.0.1",
+    "flow-bin": "^0.64.0"
+  },
+  "dependencies": {
+    "docopt": "^0.6.2",
+    "folktale": "^2.0.1",
+    "ramda": "^0.25.0"
+  }
+}
