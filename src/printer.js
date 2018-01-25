@@ -36,13 +36,13 @@ const printDispatch = line => {
     case '':
       return null
     case '#': // title
-      return [line + '\n', 'magenta', 'bold']
+      return [line + '\n', 'cyan', 'bold']
     case '>': // over all description
-      return [line + '\n', 'green']
+      return [line + '\n', 'magenta']
     case '-': // description
       return [normalLine(line), 'default']
     case '`': // code
-      return [dropFirstLast(line) + '\n', 'default', 'bold']
+      return [dropFirstLast(line) + '\n', 'green', 'dim']
   }
 }
 
@@ -53,7 +53,7 @@ const parseAndPrintFile = (fileText) => {
   fileData.forEach(line => {
     const pLine = printDispatch(line)
 
-    printCol(...pLine)
+    if (pLine) printCol(...pLine)
   })
 }
 
