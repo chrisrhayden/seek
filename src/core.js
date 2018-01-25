@@ -7,20 +7,18 @@
  */
 
 const fs = require('fs')
+const path = require('path')
+const os = require('os')
+const { exec } = require('child_process')
 const R = require('ramda')
 const { docopt } = require('docopt')
 const { task } = require('folktale/concurrency/task')
 
 const {
   colors,
-  format,
-  printNNL
+  print,
+  printCol
 } = require('./printUtils')
-
-const doc = `
-Usage:
-  core.js FILEPATH
-`
 
 /**
 const trace = R.curry((tag, x) => {
@@ -28,6 +26,39 @@ const trace = R.curry((tag, x) => {
   return x
 })
 */
+
+const gitClone = (gitUrl, baseDir) => task(
+  (resolver) => {
+    exec(`git clone ${gitUrl} ${baseDir}`, (error, stdout, stderr) => {
+      if (error) resolver.resolve(error)
+      else resolver.resolve(true)
+    })
+  }
+)
+
+function checkEnv (localData) {
+  // TODO find a real way to check for git
+  const gitBin = '/usr/bin/git'
+  if (!fs.existsSync(gitBin)) {
+    print('pleas install git')
+    return false
+  }
+
+  if (!fs.existsSync(localData)) {
+    print(`pleas make ${localData} or` +
+          'set XDG_DATA_HOME to a valide directory')
+    return false
+  }
+
+  const seekData = path.join(localData, 'seek')
+
+  if (!fs.existsSync(seekData)) {
+    const gitUrl = 'https://github.com/tldr-pages/tldr.git'
+
+    return gitClone(gitUrl, seekData).run().promise() ? seekData : false
+  }
+  return seekData
+}
 
 const map = f => x => x.map(f)
 
@@ -59,13 +90,13 @@ const printDispatch = line => {
     case '':
       return null
     case '#': // title
-      return colors.yellow + line
+      return [line + '\n', 'magenta']
     case '>': // over all description
-      return colors.green + line + '\n'
+      return [line + '\n', 'green']
     case '-': // description
-      return colors.default + normalLine(line)
+      return [normalLine(line), 'default']
     case '`': // code
-      return format.bold + dropFirstLast(line) + '\n'
+      return [dropFirstLast(line) + '\n', 'default', 'bold']
   }
 }
 
@@ -73,12 +104,10 @@ const printDispatch = line => {
 const parseAndPrintFile = (fileText) => {
   const fileData = R.split('\n', fileText)
 
-  const rst = colors.reset
-
   fileData.forEach(line => {
     const pLine = printDispatch(line)
 
-    printNNL(pLine ? `${pLine} ${rst} \n` : rst)
+    if (pLine) printCol(...pLine)
   })
 }
 
@@ -95,21 +124,67 @@ const openFile = (filePath) => task(
   }
 )
 
+const osDispatch = () => {
+  switch (os.platform()) {
+    case 'linux':
+      return 'linux'
+    case 'darwin' || 'openbsd' || 'freebsd': // sorry bsd
+      return 'osx'
+    case 'sunos':
+      return 'sunos'
+    case '':
+      return 'windows'
+  }
+}
+
+const commonOrOs = (dataPath, osName, cmd) => {
+  const commonPath = path.join(dataPath, 'pages', 'common', `${cmd}.md`)
+  const osPath = path.join(dataPath, 'pages', osName, `${cmd}.md`)
+
+  if (fs.existsSync(commonPath)) {
+    return commonPath
+  } else if (fs.existsSync(osPath)) {
+    return osPath
+  } else {
+    return false
+  }
+}
+
+function getCommandFile (dataPath, cmd) {
+  const osName = osDispatch()
+
+  const cmdPath = commonOrOs(dataPath, osName, cmd)
+
+  return cmdPath
+}
+
 /** the starting function
- *
- * TODO
- * check the env for files
- * if none get the repo
- * else show if exists
- *
- * get the text and send to the printer */
+ * get the cmd file
+ * and send to the printer */
 async function main (args) {
-  const fileText = await openFile(args.FILEPATH).run().promise()
+  const localData = process.env.XDG_DATA_HOME
+  const envData = await checkEnv(localData)
+  if (!envData) {
+    print(colors.red, 'somethings wrong, idk what tho', colors.reset)
+    return
+  }
+
+  const cmdPath = getCommandFile(envData, args.COMMAND)
+
+  if (!cmdPath) {
+    print(`sorry, cant find ${colors.red}${args.COMMAND} ${colors.reset}`)
+    return
+  }
+
+  const fileText = await openFile(cmdPath).run().promise()
 
   parseAndPrintFile(fileText)
 }
 
-/* docopt will have a fit if args aren't correct
- * so no need to check them explicitly */
-const args = docopt(doc)
+const usage = `
+Usage:
+  core.js COMMAND
+`
+
+const args = docopt(usage)
 main(args)
