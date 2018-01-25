@@ -78,6 +78,6 @@ typings/
 # dotenv environment variables file
 .env
 
-
+tags
 
 # End of https://www.gitignore.io/api/linux,git,node
