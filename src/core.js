@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 /** make a thing to show markdown on the cli
  * whith color
  *
@@ -132,7 +133,7 @@ async function main (args) {
 
 const usage = `
 Usage:
-  core.js COMMAND
+  seek COMMAND
 `
 
 const args = docopt(usage)
