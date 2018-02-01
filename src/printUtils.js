@@ -57,11 +57,11 @@ const colNum = {
 }
 
 const makeColor = (colorStr = null, formatStr = null) => {
-  const color = (colNum[colorStr]) ? colNum[colorStr] : '0'
+  const ifColor = (colNum[colorStr]) ? colNum[colorStr] : '0'
 
   const ifFormat = (format[formatStr]) ? format[formatStr] + ';' : ''
 
-  const pColor = '\033[' + ifFormat + color + 'm'
+  const pColor = '\033[' + ifFormat + ifColor + 'm'
 
   return pColor
 }
