@@ -11,9 +11,12 @@ const fs = require('fs')
 const path = require('path')
 const os = require('os')
 const { exec } = require('child_process')
+
+const R = require('ramda')
 const { docopt } = require('docopt')
 const { task } = require('folktale/concurrency/task')
 
+const { Data, PathError } = require('./Ether.js')
 const { parseAndPrintFile } = require('./printer')
 
 const {
@@ -22,6 +25,8 @@ const {
 } = require('./printUtils')
 
 /**
+const map = f => x => x.map(f)
+
 const trace = R.curry((tag, x) => {
   console.log(tag, x)
   return x
@@ -32,34 +37,10 @@ const gitClone = (gitUrl, baseDir) => task(
   (resolver) => {
     exec(`git clone ${gitUrl} ${baseDir}`, (error, stdout, stderr) => {
       if (error) resolver.resolve(error)
-      else resolver.resolve(true)
+      else resolver.resolve(stdout)
     })
   }
 )
-
-function checkEnv (localData) {
-  // TODO find a real way to check for git
-  const gitBin = '/usr/bin/git'
-  if (!fs.existsSync(gitBin)) {
-    print('pleas install git')
-    return false
-  }
-
-  if (!fs.existsSync(localData)) {
-    print(`pleas make ${localData} or` +
-          'set XDG_DATA_HOME to a valide directory')
-    return false
-  }
-
-  const seekData = path.join(localData, 'seek')
-
-  if (!fs.existsSync(seekData)) {
-    const gitUrl = 'https://github.com/tldr-pages/tldr.git'
-
-    return gitClone(gitUrl, seekData).run().promise() ? seekData : false
-  }
-  return seekData
-}
 
 /** fs.fileRead() using folktale task()
  *
@@ -82,14 +63,20 @@ const osDispatch = () => {
       return 'osx'
     case 'sunos':
       return 'sunos'
-    case '':
+    case 'win32':
       return 'windows'
   }
 }
 
-const commonOrOs = (dataPath, osName, cmd) => {
-  const commonPath = path.join(dataPath, 'pages', 'common', `${cmd}.md`)
-  const osPath = path.join(dataPath, 'pages', osName, `${cmd}.md`)
+const commonOrOs = (dataPath, cmd) => {
+  const makePage = (pageDir) => {
+    return path.join(dataPath, 'pages', pageDir, `${cmd}.md`)
+  }
+
+  const getOsPath = R.compose(makePage, osDispatch)
+
+  const commonPath = makePage('common')
+  const osPath = getOsPath()
 
   if (fs.existsSync(commonPath)) {
     return commonPath
@@ -100,26 +87,67 @@ const commonOrOs = (dataPath, osName, cmd) => {
   }
 }
 
-function getCommandFile (dataPath, cmd) {
-  const osName = osDispatch()
-
-  const cmdPath = commonOrOs(dataPath, osName, cmd)
+function getCommandFile (cmd, dataPath) {
+  const cmdPath = commonOrOs(dataPath, cmd)
 
   return cmdPath
+}
+
+function checkEnvGetPath (localPath) {
+  // TODO find a real way to check for git
+  const gitBin = '/usr/bin/git'
+  if (!fs.existsSync(gitBin)) {
+    return PathError.of('pleas install git')
+  } else if (!fs.existsSync(localPath)) {
+    return PathError.of(`pleas make ${localPath} or` +
+                        'set XDG_DATA_HOME to a valid directory')
+  } else {
+    return Data.of(path.join(localPath, 'seek'))
+  }
+}
+
+const runGitClone = url => path => gitClone(url, path).run().promise()
+
+const cloneTldrRepo = runGitClone('https://github.com/tldr-pages/tldr.git')
+
+const maybeCloneRepo = async dataPath => {
+  if (!fs.existsSync(dataPath)) {
+    print('no local files, cloning repo \n' +
+      'url ' + colors.green + 'https://github.com/tldr-pages/tldr.git \n' +
+      colors.reset + 'local path ' + colors.green + dataPath +
+      colors.reset + '\n')
+
+    const gitPut = await cloneTldrRepo(dataPath)
+    if (gitPut) { // usually only git errors
+      print(colors.yellow, gitPut, colors.reset)
+      return false
+    }
+    return true
+  }
 }
 
 /** the starting function
  * get the cmd file
  * and send to the printer */
 async function main (args) {
-  const localData = process.env.XDG_DATA_HOME
-  const envData = await checkEnv(localData)
-  if (!envData) {
-    print(colors.red, 'somethings wrong, idk what tho', colors.reset)
+  const localPath = process.env.XDG_DATA_HOME
+
+  const maybeData = checkEnvGetPath(localPath)
+
+  let dataPath
+  if (!maybeData.isData() || !maybeData.existsS()) {
+    // print the error
+    print(dataPath)
     return
+  } else {
+    dataPath = maybeData.__value
   }
 
-  const cmdPath = getCommandFile(envData, args.COMMAND)
+  const cloneOk = maybeCloneRepo(dataPath)
+
+  if (!cloneOk) return
+
+  const cmdPath = getCommandFile(args.COMMAND, dataPath)
 
   if (!cmdPath) {
     print(`sorry, cant find ${colors.red}${args.COMMAND} ${colors.reset}`)
