@@ -137,7 +137,7 @@ async function main (args) {
   let dataPath
   if (!maybeData.isData() || !maybeData.existsS()) {
     // print the error
-    print(dataPath)
+    print(maybeData)
     return
   } else {
     dataPath = maybeData.__value
