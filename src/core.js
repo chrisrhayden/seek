@@ -15,7 +15,6 @@ const R = require('ramda')
 const { docopt } = require('docopt')
 const { task } = require('folktale/concurrency/task')
 
-const { Data, PathError } = require('./Ether')
 const { cloneRepo } = require('./gitCommands')
 const { parseAndPrintFile } = require('./printer')
 const {
@@ -34,18 +33,16 @@ const trace = R.curry((tag, x) => {
  *
  * the resolver.resolve() call /? method
  * will return the output of the fs.readFile() like magik */
-const openFile = (filePath) => task(
+const openFile = filePath => task(
   (resolver) => {
     fs.readFile(filePath, 'utf-8', (err, data) => {
       if (err) throw (err)
       else resolver.resolve(data)
     })
   }
-)
+).run().promise()
 
 const cloneTldr = cloneRepo('https://github.com/tldr-pages/tldr.git')
-
-const cloneDevCheet = cloneRepo('https://github.com/rstacruz/cheatsheets.git')
 
 const osDispatch = () => {
   switch (os.platform()) {
@@ -60,13 +57,7 @@ const osDispatch = () => {
   }
 }
 
-const checkDevFile = (dataPath, cheet) => {
-  const cheetPath = path.join(dataPath, 'devcheet', `${cheet}.md`)
-
-  return (fs.existsSync(cheetPath)) ? cheetPath : false
-}
-
-const checkTldrFile = (dataPath, cmd) => {
+function checkTldrFile (dataPath, cmd) {
   const makeTldrPage = pgDir => path.join(
     dataPath, 'tldr', 'pages', pgDir, `${cmd}.md`)
 
@@ -83,61 +74,44 @@ const checkTldrFile = (dataPath, cmd) => {
   }
 }
 
-function checkEnvGetPath (localPath) {
+function checkEnv (localPath) {
   // TODO find a real way to check for git
   if (!fs.existsSync('/usr/bin/git')) {
-    return PathError.of('pleas install git')
+    print('pleas install git')
+    return false
   } else if (!fs.existsSync(localPath)) {
-    return PathError.of(`pleas make ${localPath} or` +
-                        'set XDG_DATA_HOME to a valid directory')
+    print('pleas use XDG_DATA_HOME')
+    return false
   } else {
-    return Data.of(path.join(localPath, 'seek'))
+    return localPath
   }
 }
+
+const makeSeekPath = lPath => (lPath) ? path.join(lPath, 'seek') : false
 
 /** the starting function
  * get the cmd file
  * and send to the printer */
 async function main (args) {
-  const localPath = process.env.XDG_DATA_HOME
+  const getSeekPath = R.compose(makeSeekPath, checkEnv)
 
-  const maybeData = checkEnvGetPath(localPath)
-
-  let seekPath
-  if (!maybeData.isData()) {
-    // print the error
-    print('error', maybeData)
-    return
-  } else {
-    seekPath = maybeData.__value
-  }
+  const seekPath = getSeekPath(process.env.XDG_DATA_HOME)
 
   if (!fs.existsSync(seekPath)) {
-    print('cloning repos')
-    const tlPath = path.join(seekPath, 'tldr')
-    const devPath = path.join(seekPath, 'devcheet')
-
-    const tlOk = await cloneTldr(tlPath)
-
-    const devOk = await cloneDevCheet(devPath)
-    if (!tlOk || !devOk) return
+    print('no local files,')
+    const tlOk = await cloneTldr(path.join(seekPath, 'tldr'))
+    if (!tlOk) return
   }
 
   const tldrPath = checkTldrFile(seekPath, args.QUERY)
-  const devPath = checkDevFile(seekPath, args.QUERY)
 
-  if (!tldrPath && !devPath) {
-    print(`sorry, cant find ${colors.red}${args.QUERY} ${colors.reset}`)
-    return
+  if (!tldrPath) {
+    return print(`sorry, cant find ${colors.red}${args.QUERY} ${colors.reset}`)
   }
 
-  const pages = [tldrPath, devPath].filter(x => x)
+  const fileText = await openFile(tldrPath)
 
-  const runOpenFile = f => openFile(f).run().promise()
-
-  Promise.all(R.map(runOpenFile, pages)).then(vals => {
-    R.map(parseAndPrintFile, vals)
-  })
+  parseAndPrintFile(fileText)
 }
 
 const usage = `

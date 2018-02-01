@@ -6,22 +6,6 @@ const {
   colors,
   print
 } = require('./printUtils')
-/**
-const path = require('path')
-const os = require('os')
-
-const { docopt } = require('docopt')
-
-const { Data, PathError } = require('./Ether.js')
-const { parseAndPrintFile } = require('./printer')
-
-const map = f => x => x.map(f)
-
-const trace = R.curry((tag, x) => {
-  console.log(tag, x)
-  return x
-})
-*/
 
 const gitClone = (gitUrl, baseDir) => task(
   (resolver) => {
@@ -34,7 +18,7 @@ const gitClone = (gitUrl, baseDir) => task(
 
 const cloneRepo = url => async dataPath => {
   if (!fs.existsSync(dataPath)) {
-    print('no local files, cloning repo \n' +
+    print('cloning repo \n' +
       'url ' + colors.green + `${url} \n` +
       colors.reset + 'local path ' + colors.green + dataPath +
       colors.reset + '\n')
