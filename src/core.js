@@ -10,37 +10,25 @@
 const fs = require('fs')
 const path = require('path')
 const os = require('os')
-const { exec } = require('child_process')
 
 const R = require('ramda')
 const { docopt } = require('docopt')
 const { task } = require('folktale/concurrency/task')
 
-const { Data, PathError } = require('./Ether.js')
+const { Data, PathError } = require('./Ether')
+const { cloneRepo } = require('./gitCommands')
 const { parseAndPrintFile } = require('./printer')
-
 const {
   colors,
   print
 } = require('./printUtils')
 
 /**
-const map = f => x => x.map(f)
-
 const trace = R.curry((tag, x) => {
   console.log(tag, x)
   return x
 })
 */
-
-const gitClone = (gitUrl, baseDir) => task(
-  (resolver) => {
-    exec(`git clone ${gitUrl} ${baseDir}`, (error, stdout, stderr) => {
-      if (error) resolver.resolve(error)
-      else resolver.resolve(stdout)
-    })
-  }
-)
 
 /** fs.fileRead() using folktale task()
  *
@@ -55,6 +43,10 @@ const openFile = (filePath) => task(
   }
 )
 
+const cloneTldr = cloneRepo('https://github.com/tldr-pages/tldr.git')
+
+const cloneDevCheet = cloneRepo('https://github.com/rstacruz/cheatsheets.git')
+
 const osDispatch = () => {
   switch (os.platform()) {
     case 'linux':
@@ -68,15 +60,19 @@ const osDispatch = () => {
   }
 }
 
-const commonOrOs = (dataPath, cmd) => {
-  const makePage = (pageDir) => {
-    return path.join(dataPath, 'pages', pageDir, `${cmd}.md`)
-  }
+const checkDevFile = (dataPath, cheet) => {
+  const cheetPath = path.join(dataPath, 'devcheet', `${cheet}.md`)
 
-  const getOsPath = R.compose(makePage, osDispatch)
+  return (fs.existsSync(cheetPath)) ? cheetPath : false
+}
 
-  const commonPath = makePage('common')
-  const osPath = getOsPath()
+const checkTldrFile = (dataPath, cmd) => {
+  const makeTldrPage = pgDir => path.join(
+    dataPath, 'tldr', 'pages', pgDir, `${cmd}.md`)
+
+  const osPath = makeTldrPage(osDispatch())
+
+  const commonPath = makeTldrPage('common')
 
   if (fs.existsSync(commonPath)) {
     return commonPath
@@ -87,42 +83,15 @@ const commonOrOs = (dataPath, cmd) => {
   }
 }
 
-function getCommandFile (cmd, dataPath) {
-  const cmdPath = commonOrOs(dataPath, cmd)
-
-  return cmdPath
-}
-
 function checkEnvGetPath (localPath) {
   // TODO find a real way to check for git
-  const gitBin = '/usr/bin/git'
-  if (!fs.existsSync(gitBin)) {
+  if (!fs.existsSync('/usr/bin/git')) {
     return PathError.of('pleas install git')
   } else if (!fs.existsSync(localPath)) {
     return PathError.of(`pleas make ${localPath} or` +
                         'set XDG_DATA_HOME to a valid directory')
   } else {
     return Data.of(path.join(localPath, 'seek'))
-  }
-}
-
-const runGitClone = url => path => gitClone(url, path).run().promise()
-
-const cloneTldrRepo = runGitClone('https://github.com/tldr-pages/tldr.git')
-
-const maybeCloneRepo = async dataPath => {
-  if (!fs.existsSync(dataPath)) {
-    print('no local files, cloning repo \n' +
-      'url ' + colors.green + 'https://github.com/tldr-pages/tldr.git \n' +
-      colors.reset + 'local path ' + colors.green + dataPath +
-      colors.reset + '\n')
-
-    const gitPut = await cloneTldrRepo(dataPath)
-    if (gitPut) { // usually only git errors
-      print(colors.yellow, gitPut, colors.reset)
-      return false
-    }
-    return true
   }
 }
 
@@ -134,34 +103,46 @@ async function main (args) {
 
   const maybeData = checkEnvGetPath(localPath)
 
-  let dataPath
-  if (!maybeData.isData() || !maybeData.existsS()) {
+  let seekPath
+  if (!maybeData.isData()) {
     // print the error
-    print(maybeData)
+    print('error', maybeData)
     return
   } else {
-    dataPath = maybeData.__value
+    seekPath = maybeData.__value
   }
 
-  const cloneOk = maybeCloneRepo(dataPath)
+  if (!fs.existsSync(seekPath)) {
+    print('cloning repos')
+    const tlPath = path.join(seekPath, 'tldr')
+    const devPath = path.join(seekPath, 'devcheet')
 
-  if (!cloneOk) return
+    const tlOk = await cloneTldr(tlPath)
 
-  const cmdPath = getCommandFile(args.COMMAND, dataPath)
+    const devOk = await cloneDevCheet(devPath)
+    if (!tlOk || !devOk) return
+  }
 
-  if (!cmdPath) {
-    print(`sorry, cant find ${colors.red}${args.COMMAND} ${colors.reset}`)
+  const tldrPath = checkTldrFile(seekPath, args.QUERY)
+  const devPath = checkDevFile(seekPath, args.QUERY)
+
+  if (!tldrPath && !devPath) {
+    print(`sorry, cant find ${colors.red}${args.QUERY} ${colors.reset}`)
     return
   }
 
-  const fileText = await openFile(cmdPath).run().promise()
+  const pages = [tldrPath, devPath].filter(x => x)
 
-  parseAndPrintFile(fileText)
+  const runOpenFile = f => openFile(f).run().promise()
+
+  Promise.all(R.map(runOpenFile, pages)).then(vals => {
+    R.map(parseAndPrintFile, vals)
+  })
 }
 
 const usage = `
 Usage:
-  seek COMMAND
+  seek QUERY
 `
 
 const args = docopt(usage)
