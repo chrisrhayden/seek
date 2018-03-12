@@ -4,20 +4,20 @@
 const R = require('ramda')
 const {
   printCol
-} = require('./printUtils')
+} = require('./utils')
 
 const map = f => x => x.map(f)
 
 const dropFirst = R.slice(1, Infinity)
 
-const dropLast = line => line.slice(0, line.length - 1)
+const dropLast = line => R.slice(0, line.length - 1, line)
 
 const dropFirstLast = R.compose(dropFirst, dropLast)
 
-const newLiOrNot = (w, i) => (i && i % 10 === 0) ? w + '\n' : w
+const addNewLines = (w, i) => (i && i % 10 === 0) ? w + '\n' : w
 
 const truncateLine = R.compose(
-  R.join(' '), map(newLiOrNot), R.split(' '))
+  R.join(' '), map(addNewLines), R.split(' '))
 
 const shortDropFirst = R.compose(truncateLine, dropFirst)
 
@@ -46,9 +46,9 @@ const parseAndPrintFile = (fileText) => {
   const fileData = cleanData(fileText)
 
   fileData.forEach(line => {
-    const pLine = printDispatch(line)
+    const [nLine, color, style] = printDispatch(line)
 
-    printCol(...pLine)
+    printCol(nLine, color, style)
   })
 }
 

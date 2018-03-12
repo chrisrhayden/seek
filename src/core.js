@@ -11,23 +11,57 @@ const fs = require('fs')
 const path = require('path')
 const os = require('os')
 
-const R = require('ramda')
 const { docopt } = require('docopt')
 const { task } = require('folktale/concurrency/task')
 
-const { cloneRepo } = require('./gitCommands')
 const { parseAndPrintFile } = require('./printer')
 const {
+  cloneRepo,
   colors,
   print
-} = require('./printUtils')
+} = require('./utils')
 
-/**
-const trace = R.curry((tag, x) => {
-  console.log(tag, x)
-  return x
-})
-*/
+function osDispatch () {
+  switch (os.platform()) {
+    case 'linux':
+      return 'linux'
+    case 'darwin' || 'openbsd' || 'freebsd': // sorry bsd
+      return 'osx'
+    case 'sunos':
+      return 'sunos'
+    case 'win32':
+      return 'windows'
+  }
+}
+
+function makeEnv () {
+  const theOS = osDispatch()
+
+  if (theOS === 'linux') {
+    const homeSeek = path.join(process.env.HOME, '.seek')
+
+    if (fs.existsSync(homeSeek)) {
+      return homeSeek
+    }
+
+    const localPath = process.env.XDG_DATA_HOME
+    const seek = path.join(localPath, 'seek')
+
+    if (!fs.existsSync(localPath)) {
+      fs.mkdirSync(localPath)
+    }
+
+    if (!fs.existsSync(seek)) {
+      fs.mkdirSync(seek)
+    }
+
+    return seek
+  } else {
+    const localPath = process.env.HOME
+    fs.mkdirSync(localPath)
+    return localPath
+  }
+}
 
 /** fs.fileRead() using folktale task()
  *
@@ -42,21 +76,6 @@ const openFile = filePath => task(
   }
 ).run().promise()
 
-const cloneTldr = cloneRepo('https://github.com/tldr-pages/tldr.git')
-
-const osDispatch = () => {
-  switch (os.platform()) {
-    case 'linux':
-      return 'linux'
-    case 'darwin' || 'openbsd' || 'freebsd': // sorry bsd
-      return 'osx'
-    case 'sunos':
-      return 'sunos'
-    case 'win32':
-      return 'windows'
-  }
-}
-
 function checkTldrFile (dataPath, cmd) {
   const makeTldrPage = pgDir => path.join(
     dataPath, 'tldr', 'pages', pgDir, `${cmd}.md`)
@@ -65,37 +84,18 @@ function checkTldrFile (dataPath, cmd) {
 
   const commonPath = makeTldrPage('common')
 
-  if (fs.existsSync(commonPath)) {
-    return commonPath
-  } else if (fs.existsSync(osPath)) {
-    return osPath
-  } else {
-    return false
-  }
+  if (fs.existsSync(commonPath)) return commonPath
+  else if (fs.existsSync(osPath)) return osPath
+  else return false
 }
 
-function checkEnv (localPath) {
-  // TODO find a real way to check for git
-  if (!fs.existsSync('/usr/bin/git')) {
-    print('pleas install git')
-    return false
-  } else if (!fs.existsSync(localPath)) {
-    print('pleas use XDG_DATA_HOME')
-    return false
-  } else {
-    return localPath
-  }
-}
-
-const makeSeekPath = lPath => (lPath) ? path.join(lPath, 'seek') : false
+const cloneTldr = cloneRepo('https://github.com/tldr-pages/tldr.git')
 
 /** the starting function
  * get the cmd file
  * and send to the printer */
 async function main (args) {
-  const getSeekPath = R.compose(makeSeekPath, checkEnv)
-
-  const seekPath = getSeekPath(process.env.XDG_DATA_HOME)
+  const seekPath = makeEnv()
 
   if (!fs.existsSync(seekPath)) {
     print('no local files,')
@@ -119,5 +119,4 @@ Usage:
   seek QUERY
 `
 
-const args = docopt(usage)
-main(args)
+main(docopt(usage))
