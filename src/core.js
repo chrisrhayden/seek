@@ -38,24 +38,13 @@ function makeEnv () {
   const theOS = osDispatch()
 
   if (theOS === 'linux') {
-    const homeSeek = path.join(process.env.HOME, '.seek')
-
-    if (fs.existsSync(homeSeek)) {
-      return homeSeek
-    }
-
     const localPath = process.env.XDG_DATA_HOME
     const seek = path.join(localPath, 'seek')
 
-    if (!fs.existsSync(localPath)) {
-      fs.mkdirSync(localPath)
-    }
+    if (!fs.existsSync(localPath)) fs.mkdirSync(localPath)
 
-    if (!fs.existsSync(seek)) {
-      fs.mkdirSync(seek)
-    }
+    if (!fs.existsSync(seek)) fs.mkdirSync(seek)
 
-    print('linux')
     return seek
   } else {
     const localPath = process.env.HOME
@@ -98,20 +87,20 @@ const cloneTldr = cloneRepo('https://github.com/tldr-pages/tldr.git')
 async function main (args) {
   const seekPath = makeEnv()
 
-  if (!fs.existsSync(seekPath)) {
+  const tldrPath = path.join(seekPath, 'tldr')
+
+  if (!fs.existsSync(tldrPath)) {
     print('no local files,')
-    const tlOk = await cloneTldr(path.join(seekPath, 'tldr'))
+    const tlOk = await cloneTldr(tldrPath)
     if (!tlOk) return
   }
-  print('>>> ')
+  const tldrFile = checkTldrFile(seekPath, args.QUERY)
 
-  const tldrPath = checkTldrFile(seekPath, args.QUERY)
-
-  if (!tldrPath) {
+  if (!tldrFile) {
     return print(`sorry, cant find ${colors.red}${args.QUERY} ${colors.reset}`)
   }
 
-  const fileText = await openFile(tldrPath)
+  const fileText = await openFile(tldrFile)
 
   parseAndPrintFile(fileText)
 }

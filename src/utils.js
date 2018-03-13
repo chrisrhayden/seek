@@ -2,6 +2,7 @@
 const { task } = require('folktale/concurrency/task')
 const { exec } = require('child_process')
 const fs = require('fs')
+const R = require('ramda')
 
 const print = console.log
 
@@ -85,7 +86,7 @@ const gitClone = (gitUrl, baseDir) => task(
   }
 )
 
-const cloneRepo = url => async dataPath => {
+const u_cloneRepo = async (url, dataPath)=> {
   if (!fs.existsSync(dataPath)) {
     print('cloning repo \n' +
       'url ' + colors.green + `${url} \n` +
@@ -101,6 +102,8 @@ const cloneRepo = url => async dataPath => {
     return true
   }
 }
+
+const cloneRepo = R.curry(u_cloneRepo)
 
 exports.colors = colors
 exports.format = format
