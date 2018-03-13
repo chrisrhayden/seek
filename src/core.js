@@ -55,6 +55,7 @@ function makeEnv () {
       fs.mkdirSync(seek)
     }
 
+    print('linux')
     return seek
   } else {
     const localPath = process.env.HOME
@@ -102,6 +103,7 @@ async function main (args) {
     const tlOk = await cloneTldr(path.join(seekPath, 'tldr'))
     if (!tlOk) return
   }
+  print('>>> ')
 
   const tldrPath = checkTldrFile(seekPath, args.QUERY)
 
