@@ -10,6 +10,7 @@ const printNNL = x => {
   process.stdout.write(x)
 }
 
+/** mostly for the printColor */
 const format = {
   bold: '1',
   dim: '2',
@@ -61,17 +62,17 @@ const colNum = {
   rstNli: ' \033[0m \n'
 }
 
+// make a single color
 const makeColor = (colorStr = null, formatStr = null) => {
-  const ifColor = (colNum[colorStr]) ? colNum[colorStr] : '0'
+  // make color or format if they exists
+  const ifColor = colNum[colorStr] ? colNum[colorStr] : '0'
+  const ifFormat = format[formatStr] ? format[formatStr] + ';' : ''
 
-  const ifFormat = (format[formatStr]) ? format[formatStr] + ';' : ''
-
-  const pColor = '\033[' + ifFormat + ifColor + 'm'
-
-  return pColor
+  // return the full color
+  return '\033[' + ifFormat + ifColor + 'm'
 }
 
-const printCol = (pText, colorStr = null, formatStr = null) => {
+const printColor = (pText, colorStr = null, formatStr = null) => {
   const outText = makeColor(colorStr, formatStr) + pText + colNum.rstNli
 
   process.stdout.write(outText)
@@ -108,6 +109,6 @@ const cloneRepo = R.curry(u_cloneRepo)
 exports.colors = colors
 exports.format = format
 exports.print = print
-exports.printCol = printCol
+exports.printColor = printColor
 exports.printNNL = printNNL
 exports.cloneRepo = cloneRepo

@@ -1,12 +1,9 @@
-/** The printer
- */
-
 const R = require('ramda')
 const {
-  printCol
+  printColor
 } = require('./utils')
 
-const map = f => x => x.map(f)
+const map = R.curry((f, x) => x.map(f))
 
 const dropFirst = R.slice(1, Infinity)
 
@@ -16,8 +13,7 @@ const dropFirstLast = R.compose(dropFirst, dropLast)
 
 const addNewLines = (w, i) => (i && i % 10 === 0) ? w + '\n' : w
 
-const truncateLine = R.compose(
-  R.join(' '), map(addNewLines), R.split(' '))
+const truncateLine = R.compose(R.join(' '), map(addNewLines), R.split(' '))
 
 const shortDropFirst = R.compose(truncateLine, dropFirst)
 
@@ -35,21 +31,20 @@ const printDispatch = line => {
     case '-': // description
       return [normalLine(line), 'default']
     case '`': // code
-      return [dropFirstLast(line) + '\n', 'default', 'bold']
+      return [' ' + dropFirstLast(line) + '\n', 'default', 'bold']
   }
 }
 
+// const printALine = R.curry(printColor, ...printDispatch)
+const printALine = line => printColor(...printDispatch(line))
+
+// return only if the line exists
 const cleanData = R.compose(R.filter(li => li), R.split('\n'))
 
-/** map through file, sending to right print */
 const parseAndPrintFile = (fileText) => {
   const fileData = cleanData(fileText)
 
-  fileData.forEach(line => {
-    const [nLine, color, style] = printDispatch(line)
-
-    printCol(nLine, color, style)
-  })
+  map(printALine, fileData)
 }
 
 exports.parseAndPrintFile = parseAndPrintFile

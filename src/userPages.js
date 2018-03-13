@@ -6,8 +6,7 @@ const R = require('ramda')
 const { task } = require('folktale/concurrency/task')
 
 const {
-  print,
-  colors
+  print
 } = require('./printUtils')
 
 const dropTwo = R.slice(2, Infinity)
