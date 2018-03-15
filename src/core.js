@@ -14,12 +14,14 @@ const os = require('os')
 const { docopt } = require('docopt')
 const { task } = require('folktale/concurrency/task')
 
-const { parseAndPrintFile } = require('./printer')
+const { parseAndPrintFile } = require('./fileProcess')
 const {
   cloneRepo,
   colors,
   print
 } = require('./utils')
+
+const cloneTldr = cloneRepo('https://github.com/tldr-pages/tldr.git')
 
 function osDispatch () {
   switch (os.platform()) {
@@ -38,11 +40,12 @@ function makeEnv () {
   const theOS = osDispatch()
 
   if (theOS === 'linux') {
-    const localPath = process.env.XDG_DATA_HOME
+    const localPath = process.env.XDG_DATA_HOME || path
+      .join(process.env.HOME, 'locale', 'share')
+
     const seek = path.join(localPath, 'seek')
 
     if (!fs.existsSync(localPath)) fs.mkdirSync(localPath)
-
     if (!fs.existsSync(seek)) fs.mkdirSync(seek)
 
     return seek
@@ -71,19 +74,13 @@ function checkTldrFile (dataPath, cmd) {
     dataPath, 'tldr', 'pages', pgDir, `${cmd}.md`)
 
   const osPath = makeTldrPage(osDispatch())
+  if (fs.existsSync(osPath)) return osPath
 
   const commonPath = makeTldrPage('common')
-
-  if (fs.existsSync(commonPath)) return commonPath
-  else if (fs.existsSync(osPath)) return osPath
-  else return false
+  return fs.existsSync(commonPath) ? commonPath : false
 }
 
-const cloneTldr = cloneRepo('https://github.com/tldr-pages/tldr.git')
-
-/** the starting function
- * get the cmd file
- * and send to the printer */
+/* get the cmd file and send to the printer */
 async function main (args) {
   const seekPath = makeEnv()
 
@@ -94,6 +91,7 @@ async function main (args) {
     const tlOk = await cloneTldr(tldrPath)
     if (!tlOk) return
   }
+
   const tldrFile = checkTldrFile(seekPath, args.QUERY)
 
   if (!tldrFile) {
@@ -105,9 +103,6 @@ async function main (args) {
   parseAndPrintFile(fileText)
 }
 
-const usage = `
-Usage:
-  seek QUERY
-`
+const usage = `Usage: seek QUERY`
 
 main(docopt(usage))
