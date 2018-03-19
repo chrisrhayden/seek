@@ -40,9 +40,10 @@ function makeEnv () {
   const theOS = osDispatch()
 
   if (theOS === 'linux') {
-    const localPath = process.env.XDG_DATA_HOME || path
-      .join(process.env.HOME, 'locale', 'share')
+    const localPath = process.env.XDG_DATA_HOME ||
+      path.join(process.env.HOME, '.local', 'share')
 
+    print(localPath)
     const seek = path.join(localPath, 'seek')
 
     if (!fs.existsSync(localPath)) fs.mkdirSync(localPath)
